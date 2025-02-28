@@ -53,8 +53,13 @@ def generate_preferences():
     round_no = data.get("round_no")
     min_prob = data.get("min_prob")
 
+    try:
+        jee_rank = int(jee_rank)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Please enter a valid JEE rank (greater than 0)"}), 400
+
     # Validate inputs
-    if not jee_rank or jee_rank <= 0:
+    if jee_rank <= 0:
         return jsonify({"error": "Please enter a valid JEE rank (greater than 0)"}), 400
 
     df = load_data()
