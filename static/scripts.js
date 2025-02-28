@@ -105,7 +105,6 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("output-table").appendChild(table);
 
         // Display the plot
-        // Assuming `data.plot` is a URL to the plot image
         const plotImg = document.createElement("img");
         plotImg.src = data.plot;
         document.getElementById("prob-plot").innerHTML = "";
