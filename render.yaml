@@ -5,4 +5,4 @@ services:
     repo: https://github.com/JARAWA/JOSAA_preference
     branch: main
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python app.py"
+    startCommand: "gunicorn -w 4 -b 0.0.0.0:10000 app:app"
