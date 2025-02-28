@@ -1,102 +1,28 @@
-from flask import Flask, request, jsonify, send_file
 import pandas as pd
+import gradio as gr
 import numpy as np
+from datetime import datetime
 import os
 import plotly.express as px
 import math
-from datetime import datetime
+import logging
 
-app = Flask(__name__)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# File path
-FILE_PATH = "josaa2024_cutoff.csv"
+# File path configuration
+FILE_PATH = os.path.join(os.path.dirname(__file__), "josaa2024_cutoff.csv")
 
-def load_data():
-    """Load and preprocess the JOSAA data"""
-    try:
-        if not os.path.exists(FILE_PATH):
-            return None
-
-        df = pd.read_csv(FILE_PATH)
-        df["Opening Rank"] = pd.to_numeric(df["Opening Rank"], errors="coerce").fillna(9999999)
-        df["Closing Rank"] = pd.to_numeric(df["Closing Rank"], errors="coerce").fillna(9999999)
-        df["Round"] = df["Round"].astype(str)
-        return df
-    except Exception as e:
-        print(f"Error loading file: {str(e)}")
-        return None
-
-@app.route("/")
-def index():
-    return send_file("index.html")
-
-@app.route("/static/<path:path>")
-def send_static(path):
-    return send_file(f"static/{path}")
-
-@app.route("/get_branches", methods=["GET"])
-def get_branches():
-    df = load_data()
-    if df is None:
-        return jsonify({"branches": []})
-
-    unique_branches = sorted(df["Academic Program Name"].dropna().unique().tolist())
-    return jsonify({"branches": ["All"] + unique_branches})
-
-@app.route("/generate_preferences", methods=["POST"])
-def generate_preferences():
-    data = request.get_json()
-    jee_rank = data.get("jee_rank")
-    category = data.get("category")
-    college_type = data.get("college_type")
-    preferred_branch = data.get("preferred_branch")
-    round_no = data.get("round_no")
-    min_prob = data.get("min_prob")
-
-    try:
-        jee_rank = int(jee_rank)
-    except (ValueError, TypeError):
-        return jsonify({"error": "Please enter a valid JEE rank (greater than 0)"}), 400
-
-    try:
-        min_prob = float(min_prob)
-    except (ValueError, TypeError):
-        return jsonify({"error": "Please enter a valid minimum probability percentage"}), 400
-
-    # Validate inputs
-    if jee_rank <= 0:
-        return jsonify({"error": "Please enter a valid JEE rank (greater than 0)"}), 400
-
-    df = load_data()
-    if df is None:
-        return jsonify({"error": "Failed to load data"}), 500
-
-    df["Category"] = df["Category"].str.lower()
-    df["Academic Program Name"] = df["Academic Program Name"].str.lower()
-    df["College Type"] = df["College Type"].str.upper()
-    category = category.lower()
-    preferred_branch = preferred_branch.lower()
-    college_type = college_type.upper()
-
-    if category != "all":
-        df = df[df["Category"] == category]
-    if college_type != "ALL":
-        df = df[df["College Type"] == college_type]
-    if preferred_branch != "all":
-        df = df[df["Academic Program Name"] == preferred_branch]
-    df = df[df["Round"] == str(round_no)]
-
-    if df.empty:
-        return jsonify({"error": "No colleges found matching your criteria"}), 404
-
-    def hybrid_probability_calculation(rank, opening_rank, closing_rank):
+class ProbabilityCalculator:
+    def calculate_probability(self, rank, opening_rank, closing_rank):
         try:
+            # Logistic calculation
             M = (opening_rank + closing_rank) / 2
-            S = (closing_rank - opening_rank) / 10
-            if S == 0:
-                S = 1
+            S = max((closing_rank - opening_rank) / 10, 1)
             logistic_prob = 1 / (1 + math.exp((rank - M) / S)) * 100
 
+            # Piece-wise calculation
             if rank < opening_rank:
                 improvement = (opening_rank - rank) / opening_rank
                 if improvement >= 0.5:
@@ -111,14 +37,11 @@ def generate_preferences():
                 if position <= 0.2:
                     piece_wise_prob = 94 - (position * 70)
                 elif position <= 0.5:
-                    normalized_pos = (position - 0.2) / 0.3
-                    piece_wise_prob = 80 - (normalized_pos * 20)
+                    piece_wise_prob = 80 - (position * 20)
                 elif position <= 0.8:
-                    normalized_pos = (position - 0.5) / 0.3
-                    piece_wise_prob = 60 - (normalized_pos * 20)
+                    piece_wise_prob = 60 - (position * 20)
                 else:
-                    normalized_pos = (position - 0.8) / 0.2
-                    piece_wise_prob = 40 - (normalized_pos * 20)
+                    piece_wise_prob = 40 - (position * 20)
             elif rank == closing_rank:
                 piece_wise_prob = 15.0
             elif rank <= closing_rank + 10:
@@ -126,6 +49,7 @@ def generate_preferences():
             else:
                 piece_wise_prob = 0.0
 
+            # Final probability
             if rank < opening_rank:
                 improvement = (opening_rank - rank) / opening_rank
                 if improvement > 0.5:
@@ -142,10 +66,10 @@ def generate_preferences():
 
             return round(final_prob, 2)
         except Exception as e:
-            print(f"Error in probability calculation: {str(e)}")
+            logger.error(f"Probability calculation error: {str(e)}")
             return 0.0
 
-    def get_probability_interpretation(probability):
+    def get_interpretation(self, probability):
         if probability >= 95:
             return "Very High Chance"
         elif probability >= 80:
@@ -156,69 +80,141 @@ def generate_preferences():
             return "Low Chance"
         elif probability > 0:
             return "Very Low Chance"
-        else:
-            return "No Chance"
+        return "No Chance"
 
-    df["Admission Probability (%)"] = df.apply(
-        lambda x: hybrid_probability_calculation(jee_rank, x["Opening Rank"], x["Closing Rank"]),
-        axis=1
-    )
-    df["Admission Chances"] = df["Admission Probability (%)"].apply(get_probability_interpretation)
+def load_data():
+    """Load and preprocess the JOSAA data"""
+    try:
+        df = pd.read_csv(FILE_PATH)
+        df["Opening Rank"] = pd.to_numeric(df["Opening Rank"], errors="coerce").fillna(9999999)
+        df["Closing Rank"] = pd.to_numeric(df["Closing Rank"], errors="coerce").fillna(9999999)
+        df["Round"] = df["Round"].astype(str)
+        return df
+    except Exception as e:
+        logger.error(f"Error loading data: {str(e)}")
+        return None
 
-    df = df[df["Admission Probability (%)"] >= min_prob]
-    df = df.sort_values("Admission Probability (%)", ascending=False)
-    df["Preference_Order"] = range(1, len(df) + 1)
-
-    result = df[[
-        "Preference_Order",
-        "Institute",
-        "College Type",
-        "Location",
-        "Academic Program Name",
-        "Opening Rank",
-        "Closing Rank",
-        "Admission Probability (%)",
-        "Admission Chances"
-    ]].rename(columns={
-        "Preference_Order": "Preference",
-        "Academic Program Name": "Branch"
-    })
-
-    fig = px.histogram(
-        result,
-        x="Admission Probability (%)",
-        title="Distribution of Admission Probabilities",
-        nbins=20,
-        color_discrete_sequence=["#3366cc"]
-    )
-    fig.update_layout(
-        xaxis_title="Admission Probability (%)",
-        yaxis_title="Number of Colleges",
-        showlegend=False,
-        title_x=0.5
-    )
-    plot_url = f"static/plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-    fig.write_image(plot_url)
-
-    return jsonify({
-        "preferences": result.to_dict(orient="records"),
-        "plot": plot_url
-    })
-
-@app.route("/download_excel")
-def download_excel():
+def get_unique_branches():
     df = load_data()
-    if df is None:
-        return "Failed to load data", 500
+    if df is not None:
+        branches = sorted(df["Academic Program Name"].dropna().unique().tolist())
+        return ["All"] + branches
+    return ["All"]
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    excel_file = f"college_preferences_{timestamp}.xlsx"
+def generate_preference_list(jee_rank, category, college_type, preferred_branch, round_no, min_probability=0):
+    try:
+        # Load and filter data
+        df = load_data()
+        if df is None:
+            return pd.DataFrame(columns=["Error"], data=[["Failed to load data"]]), None, None
 
-    writer = pd.ExcelWriter(excel_file, engine="openpyxl")
-    df.to_excel(writer, index=False)
-    writer.save()
+        # Apply filters
+        df["Category"] = df["Category"].str.lower()
+        df["Academic Program Name"] = df["Academic Program Name"].str.lower()
+        df["College Type"] = df["College Type"].str.upper()
+        
+        if category.lower() != "all":
+            df = df[df["Category"] == category.lower()]
+        if college_type.upper() != "ALL":
+            df = df[df["College Type"] == college_type.upper()]
+        if preferred_branch.lower() != "all":
+            df = df[df["Academic Program Name"] == preferred_branch.lower()]
+        df = df[df["Round"] == str(round_no)]
 
-    return send_file(excel_file, as_attachment=True)
+        # Calculate probabilities
+        calculator = ProbabilityCalculator()
+        df['Admission Probability (%)'] = df.apply(
+            lambda x: calculator.calculate_probability(jee_rank, x['Opening Rank'], x['Closing Rank']),
+            axis=1
+        )
+        df['Admission Chances'] = df['Admission Probability (%)'].apply(calculator.get_interpretation)
+
+        # Filter and sort
+        df = df[df['Admission Probability (%)'] >= min_probability]
+        df = df.sort_values('Admission Probability (%)', ascending=False)
+        df['Preference'] = range(1, len(df) + 1)
+
+        # Create visualization
+        fig = px.histogram(
+            df,
+            x='Admission Probability (%)',
+            title='Distribution of Admission Probabilities',
+            nbins=20
+        )
+
+        # Prepare final result
+        result = df[[
+            'Preference',
+            'Institute',
+            'College Type',
+            'Location',
+            'Academic Program Name',
+            'Opening Rank',
+            'Closing Rank',
+            'Admission Probability (%)',
+            'Admission Chances'
+        ]].rename(columns={'Academic Program Name': 'Branch'})
+
+        return result, None, fig
+
+    except Exception as e:
+        logger.error(f"Error generating preferences: {str(e)}")
+        return pd.DataFrame(columns=["Error"], data=[[f"Error: {str(e)}"]]), None, None
+
+# Define interface options
+categories = ["All", "OPEN", "OBC-NCL", "OBC-NCL (PwD)", "EWS", "EWS (PwD)",
+              "SC", "SC (PwD)", "ST", "ST (PwD)"]
+college_types = ["ALL", "IIT", "NIT", "IIIT", "GFTI"]
+rounds = ["1", "2", "3", "4", "5", "6"]
+branches = get_unique_branches()
+
+# Create the interface
+def create_interface():
+    with gr.Blocks(css="static/styles.css") as iface:
+        gr.Markdown("""
+        # 🎓 JOSAA College Preference List Generator
+        ### Get personalized college recommendations with admission probability predictions
+        """)
+
+        with gr.Row():
+            with gr.Column(scale=1, min_width=300):
+                jee_rank = gr.Number(label="Enter your JEE Rank", minimum=1)
+                category = gr.Dropdown(choices=categories, label="Select Category")
+                college_type = gr.Dropdown(choices=college_types, label="Select College Type")
+
+            with gr.Column(scale=1, min_width=300):
+                preferred_branch = gr.Dropdown(choices=branches, label="Select Preferred Branch")
+                round_no = gr.Dropdown(choices=rounds, label="Select Round")
+                min_prob = gr.Slider(minimum=0, maximum=100, value=30, step=5,
+                                   label="Minimum Admission Probability (%)")
+
+        with gr.Row():
+            submit_btn = gr.Button("🔍 Generate Preferences")
+
+        with gr.Row():
+            output_table = gr.Dataframe(
+                headers=["Preference", "Institute", "College Type", "Location", "Branch",
+                        "Opening Rank", "Closing Rank", "Admission Probability (%)",
+                        "Admission Chances"],
+                label="College Preferences"
+            )
+
+        with gr.Row():
+            prob_plot = gr.Plot(label="Probability Distribution")
+
+        # Handle button click
+        submit_btn.click(
+            generate_preference_list,
+            inputs=[jee_rank, category, college_type, preferred_branch, round_no, min_prob],
+            outputs=[output_table, None, prob_plot]
+        )
+
+        return iface
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    iface = create_interface()
+    iface.launch(
+        server_name="0.0.0.0",
+        server_port=int(os.environ.get("PORT", 7860)),
+        share=False
+    )
