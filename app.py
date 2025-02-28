@@ -174,7 +174,7 @@ def create_interface():
         gr.Markdown("""
         # 🎓 JOSAA College Preference List Generator
         ### Get personalized college recommendations with admission probability predictions
-        """)
+        """)       
 
         with gr.Row():
             with gr.Column(scale=1, min_width=300):
@@ -210,10 +210,12 @@ def create_interface():
         )
 
         return iface
+        
+# Create a Gradio app instance
+app = create_interface()
 
 if __name__ == "__main__":
-    iface = create_interface()
-    iface.launch(
+    app.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
         share=False
