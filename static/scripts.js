@@ -3,12 +3,10 @@ document.addEventListener("DOMContentLoaded", function() {
     const categories = ["All", "OPEN", "OBC-NCL", "OBC-NCL (PwD)", "EWS", "EWS (PwD)", "SC", "SC (PwD)", "ST", "ST (PwD)"];
     const collegeTypes = ["ALL", "IIT", "NIT", "IIIT", "GFTI"];
     const rounds = ["1", "2", "3", "4", "5", "6"];
-    const branches = []; // This should be fetched from the backend
 
     populateDropdown("category", categories);
     populateDropdown("college-type", collegeTypes);
     populateDropdown("round-no", rounds);
-    populateDropdown("preferred-branch", branches);
 
     function populateDropdown(id, options) {
         const dropdown = document.getElementById(id);
@@ -19,6 +17,14 @@ document.addEventListener("DOMContentLoaded", function() {
             dropdown.appendChild(opt);
         });
     }
+
+    // Fetch and populate branches
+    fetch("/get_branches")
+        .then(response => response.json())
+        .then(data => {
+            populateDropdown("preferred-branch", data.branches);
+        })
+        .catch(error => console.error("Error fetching branches:", error));
 
     // Update probability display
     const probInput = document.getElementById("min-prob");
