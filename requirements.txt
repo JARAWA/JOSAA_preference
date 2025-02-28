@@ -2,3 +2,4 @@ Flask
 pandas
 plotly
 openpyxl
+gunicorn
