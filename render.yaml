@@ -3,9 +3,7 @@ services:
     name: josaa-preference
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:create_interface --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
-      - key: PORT
-        value: 7860
