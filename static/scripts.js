@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function populateDropdown(id, options) {
         const dropdown = document.getElementById(id);
+        dropdown.innerHTML = ''; // Clear existing options
         options.forEach(option => {
             const opt = document.createElement("option");
             opt.value = option;
@@ -24,7 +25,10 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(data => {
             populateDropdown("preferred-branch", data.branches);
         })
-        .catch(error => console.error("Error fetching branches:", error));
+        .catch(error => {
+            console.error("Error fetching branches:", error);
+            alert("Error loading branches. Please refresh the page.");
+        });
 
     // Update probability display
     const probInput = document.getElementById("min-prob");
@@ -35,6 +39,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Handle form submission
     document.getElementById("generate-btn").addEventListener("click", function() {
+        const loading = document.getElementById("loading");
+        const resultsContainer = document.getElementById("results-container");
+        
+        // Show loading indicator
+        loading.style.display = "block";
+        resultsContainer.style.display = "none";
+        
         const jeeRank = document.getElementById("jee-rank").value;
         const category = document.getElementById("category").value;
         const collegeType = document.getElementById("college-type").value;
@@ -48,67 +59,77 @@ document.addEventListener("DOMContentLoaded", function() {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                jee_rank: jeeRank,
+                jee_rank: parseInt(jeeRank),
                 category: category,
                 college_type: collegeType,
                 preferred_branch: preferredBranch,
                 round_no: roundNo,
-                min_prob: minProb
+                min_prob: parseFloat(minProb)
             })
         })
         .then(response => response.json())
         .then(data => {
+            // Hide loading indicator
+            loading.style.display = "none";
+            
             if (data.error) {
                 alert(data.error);
-            } else {
-                displayResults(data);
-                document.getElementById("download-btn").style.display = "block";
+                return;
             }
+            
+            displayResults(data);
+            document.getElementById("download-btn").style.display = "block";
+            resultsContainer.style.display = "block";
         })
-        .catch(error => console.error("Error:", error));
+        .catch(error => {
+            loading.style.display = "none";
+            console.error("Error:", error);
+            alert("An error occurred while generating preferences. Please try again.");
+        });
     });
 
     function displayResults(data) {
         // Display the table
-        const table = document.createElement("table");
-        table.innerHTML = `
-            <thead>
-                <tr>
-                    <th>Preference</th>
-                    <th>Institute</th>
-                    <th>College Type</th>
-                    <th>Location</th>
-                    <th>Branch</th>
-                    <th>Opening Rank</th>
-                    <th>Closing Rank</th>
-                    <th>Admission Probability (%)</th>
-                    <th>Admission Chances</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${data.preferences.map(pref => `
-                    <tr>
-                        <td>${pref.Preference}</td>
-                        <td>${pref.Institute}</td>
-                        <td>${pref["College Type"]}</td>
-                        <td>${pref.Location}</td>
-                        <td>${pref.Branch}</td>
-                        <td>${pref["Opening Rank"]}</td>
-                        <td>${pref["Closing Rank"]}</td>
-                        <td>${pref["Admission Probability (%)"]}</td>
-                        <td>${pref["Admission Chances"]}</td>
-                    </tr>
-                `).join("")}
-            </tbody>
+        const tableContainer = document.getElementById("output-table");
+        tableContainer.innerHTML = `
+            <h2>College Preferences</h2>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Preference</th>
+                            <th>Institute</th>
+                            <th>College Type</th>
+                            <th>Location</th>
+                            <th>Branch</th>
+                            <th>Opening Rank</th>
+                            <th>Closing Rank</th>
+                            <th>Admission Probability (%)</th>
+                            <th>Admission Chances</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.preferences.map(pref => `
+                            <tr>
+                                <td>${pref.Preference}</td>
+                                <td>${pref.Institute}</td>
+                                <td>${pref["College Type"]}</td>
+                                <td>${pref.Location}</td>
+                                <td>${pref.Branch}</td>
+                                <td>${pref["Opening Rank"]}</td>
+                                <td>${pref["Closing Rank"]}</td>
+                                <td>${pref["Admission Probability (%)"].toFixed(2)}</td>
+                                <td>${pref["Admission Chances"]}</td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>
         `;
-        document.getElementById("output-table").innerHTML = "";
-        document.getElementById("output-table").appendChild(table);
 
         // Display the plot
-        const plotImg = document.createElement("img");
-        plotImg.src = data.plot;
-        document.getElementById("prob-plot").innerHTML = "";
-        document.getElementById("prob-plot").appendChild(plotImg);
+        const plotData = JSON.parse(data.plot);
+        Plotly.newPlot('prob-plot', plotData.data, plotData.layout);
     }
 
     // Handle download button
