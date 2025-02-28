@@ -6,6 +6,7 @@
     <title>JOSAA College Preference List Generator</title>
     <link rel="stylesheet" href="static/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
 <body>
     <header>
@@ -14,36 +15,48 @@
     </header>
     <main>
         <div class="container">
-            <section>
-                <label for="jee-rank">Enter your JEE Rank:</label>
-                <input type="number" id="jee-rank" name="jee_rank" min="1" required>
-            </section>
-            <section>
-                <label for="category">Select Category:</label>
-                <select id="category" name="category"></select>
-            </section>
-            <section>
-                <label for="college-type">Select College Type:</label>
-                <select id="college-type" name="college_type"></select>
-            </section>
-            <section>
-                <label for="preferred-branch">Select Preferred Branch:</label>
-                <select id="preferred-branch" name="preferred_branch"></select>
-            </section>
-            <section>
-                <label for="round-no">Select Round:</label>
-                <select id="round-no" name="round_no"></select>
-            </section>
-            <section>
-                <label for="min-prob">Minimum Admission Probability (%):</label>
-                <input type="range" id="min-prob" name="min_prob" min="0" max="100" value="30" step="5">
-                <span id="prob-value">30%</span>
-            </section>
-            <button id="generate-btn" class="btn-primary"><i class="fas fa-search"></i> Generate Preferences</button>
-            <button id="download-btn" class="btn-secondary" style="display:none;"><i class="fas fa-download"></i> Download Excel</button>
+            <div class="form-container">
+                <div class="input-group">
+                    <label for="jee-rank">Enter your JEE Rank:</label>
+                    <input type="number" id="jee-rank" name="jee_rank" min="1" required>
+                </div>
+                <div class="input-group">
+                    <label for="category">Select Category:</label>
+                    <select id="category" name="category"></select>
+                </div>
+                <div class="input-group">
+                    <label for="college-type">Select College Type:</label>
+                    <select id="college-type" name="college_type"></select>
+                </div>
+                <div class="input-group">
+                    <label for="preferred-branch">Select Preferred Branch:</label>
+                    <select id="preferred-branch" name="preferred_branch"></select>
+                </div>
+                <div class="input-group">
+                    <label for="round-no">Select Round:</label>
+                    <select id="round-no" name="round_no"></select>
+                </div>
+                <div class="input-group">
+                    <label for="min-prob">Minimum Admission Probability (%):</label>
+                    <div class="slider-container">
+                        <input type="range" id="min-prob" name="min_prob" min="0" max="100" value="30" step="5">
+                        <span id="prob-value">30%</span>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button id="generate-btn" class="btn-primary"><i class="fas fa-search"></i> Generate Preferences</button>
+                    <button id="download-btn" class="btn-secondary" style="display:none;"><i class="fas fa-download"></i> Download Excel</button>
+                </div>
+            </div>
         </div>
-        <section id="output-table"></section>
-        <section id="prob-plot"></section>
+        <div id="loading" style="display: none;">
+            <div class="loader"></div>
+            <p>Generating preferences...</p>
+        </div>
+        <div id="results-container" style="display: none;">
+            <div id="output-table"></div>
+            <div id="prob-plot"></div>
+        </div>
     </main>
     <footer>
         <p>&copy; 2025 JOSAA College Preference List Generator</p>
