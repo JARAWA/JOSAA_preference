@@ -34,6 +34,15 @@ def index():
 def send_static(path):
     return send_file(f"static/{path}")
 
+@app.route("/get_branches", methods=["GET"])
+def get_branches():
+    df = load_data()
+    if df is None:
+        return jsonify({"branches": []})
+
+    unique_branches = sorted(df["Academic Program Name"].dropna().unique().tolist())
+    return jsonify({"branches": ["All"] + unique_branches})
+
 @app.route("/generate_preferences", methods=["POST"])
 def generate_preferences():
     data = request.get_json()
