@@ -58,6 +58,11 @@ def generate_preferences():
     except (ValueError, TypeError):
         return jsonify({"error": "Please enter a valid JEE rank (greater than 0)"}), 400
 
+    try:
+        min_prob = float(min_prob)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Please enter a valid minimum probability percentage"}), 400
+
     # Validate inputs
     if jee_rank <= 0:
         return jsonify({"error": "Please enter a valid JEE rank (greater than 0)"}), 400
