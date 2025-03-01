@@ -39,9 +39,8 @@ class PredictionOutput(BaseModel):
 
 # Utility functions
 def load_data():
-    """Load and preprocess the JOSAA data from GitHub"""
     try:
-        url = "https://raw.githubusercontent.com/JARAWA/JOSAA_preference/main/josaa2024_cutoff.csv"
+        url = "https://raw.githubusercontent.com/JARAWA/JOSAA_preference/refs/heads/main/josaa2024_cutoff.csv"
         response = requests.get(url)
         response.raise_for_status()
         
@@ -55,11 +54,15 @@ def load_data():
         return None
 
 def get_unique_branches():
-    df = load_data()
-    if df is not None:
-        unique_branches = sorted(df["Academic Program Name"].dropna().unique().tolist())
-        return ["All"] + unique_branches
-    return ["All"]
+    try:
+        df = load_data()
+        if df is not None:
+            unique_branches = sorted(df["Academic Program Name"].dropna().unique().tolist())
+            return ["All"] + unique_branches
+        return ["All"]
+    except Exception as e:
+        print(f"Error getting branches: {e}")
+        return ["All"]
 
 def hybrid_probability_calculation(rank, opening_rank, closing_rank):
     try:
@@ -190,7 +193,6 @@ def predict_preferences(jee_rank, category, college_type, preferred_branch, roun
             'Academic Program Name': 'Branch'
         })
 
-        # Create plot
         fig = px.histogram(
             result,
             x='Admission Probability (%)',
@@ -206,8 +208,10 @@ def predict_preferences(jee_rank, category, college_type, preferred_branch, roun
         )
 
         return result, None, fig
+    except Exception as e:
+        print(f"Error in predict_preferences: {str(e)}")
+        return pd.DataFrame({"Error": [str(e)]}), None, None
 
-# Create Gradio interface
 def create_gradio_interface():
     with gr.Blocks() as iface:
         gr.Markdown("""
