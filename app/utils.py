@@ -6,19 +6,36 @@ from pathlib import Path
 from datetime import datetime
 
 def load_data():
-    """Load and preprocess the JOSAA data"""
+    """Load and preprocess the JOSAA data from GitHub"""
     try:
-        file_path = Path(__file__).parent.parent / "data" / "josaa2024_cutoff.csv"
-        if not file_path.exists():
-            raise FileNotFoundError(f"Data file not found at {file_path}")
+        import requests
+        
+        # GitHub raw content URL
+        github_url = "https://raw.githubusercontent.com/JARAWA/JOSAA_preference/refs/heads/main/josaa2024_cutoff.csv"
+        
+        # Check if URL is accessible
+        response = requests.get(github_url)
+        if response.status_code != 200:
+            raise Exception(f"Failed to access GitHub file. Status code: {response.status_code}")
+            
+        # Read CSV from content
+        from io import StringIO
+        df = pd.read_csv(StringIO(response.text))
+        print(f"Data loaded successfully. Shape: {df.shape}")
+        print("CSV Columns:", df.columns.tolist())
+        print("\nSample data:")
+        print(df.head())
 
-        df = pd.read_csv(file_path)
+        # Preprocess the data
         df["Opening Rank"] = pd.to_numeric(df["Opening Rank"], errors="coerce").fillna(9999999)
         df["Closing Rank"] = pd.to_numeric(df["Closing Rank"], errors="coerce").fillna(9999999)
         df["Round"] = df["Round"].astype(str)
+
+        print("Data preprocessing completed")
         return df
+
     except Exception as e:
-        print(f"Error loading file: {str(e)}")
+        print(f"Error loading data: {str(e)}")
         return None
 
 def get_unique_branches():
