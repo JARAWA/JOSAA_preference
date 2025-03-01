@@ -4,7 +4,7 @@ import requests
 import json
 from .utils import get_unique_branches
 
-API_URL = "https://your-render-app.onrender.com"  # Update this after deployment
+API_URL = "https://josaa-preference.onrender.com"  # Update this after deployment
 
 def predict_preferences(jee_rank, category, college_type, preferred_branch, round_no, min_prob):
     try:
